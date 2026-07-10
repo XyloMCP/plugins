@@ -1,0 +1,20 @@
+{
+  "name": "xylo",
+  "interface": {
+    "displayName": "Xylo"
+  },
+  "plugins": [
+    {
+      "name": "xylo",
+      "source": {
+        "source": "local",
+        "path": "./plugins/xylo"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "xylo",
+  "version": "1.0.0",
+  "description": "Manage Meta, Google, and TikTok ads from Codex with Xylo.",
+  "author": {
+    "name": "Morpheus Media",
+    "email": "support@xylomcp.com",
+    "url": "https://xylomcp.com"
+  },
+  "homepage": "https://xylomcp.com/docs",
+  "repository": "https://github.com/XyloMCP/plugins",
+  "keywords": ["advertising", "meta-ads", "google-ads", "tiktok-ads", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Xylo",
+    "shortDescription": "Run Meta, Google, and TikTok ads from Codex.",
+    "longDescription": "Connect Codex to Xylo's 300+ ad operations across Meta Ads, Google Ads, and TikTok Ads, with an embedded workflow and safety playbook.",
+    "developerName": "Morpheus Media",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://xylomcp.com",
+    "privacyPolicyURL": "https://xylomcp.com/privacy",
+    "termsOfServiceURL": "https://xylomcp.com/terms",
+    "defaultPrompt": [
+      "Audit my ad accounts and prioritize the biggest opportunities.",
+      "Show me the best and worst campaigns from the last 30 days.",
+      "Build a paused campaign from my brief and existing brand knowledge."
+    ],
+    "brandColor": "#E8BE55",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png"
+  }
+}

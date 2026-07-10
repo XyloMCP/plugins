@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "xylo": {
+      "type": "http",
+      "url": "https://xylomcp.com/api/mcp",
+      "auth": "oauth"
+    }
+  }
+}
