@@ -3,7 +3,8 @@
     "xylo": {
       "type": "http",
       "url": "https://xylomcp.com/api/mcp",
-      "auth": "oauth"
+      "auth": "oauth",
+      "oauth_resource": "https://xylomcp.com/api/mcp"
     }
   }
 }
