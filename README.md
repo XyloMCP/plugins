@@ -1,6 +1,6 @@
 # Xylo plugins
 
-Official Codex plugin marketplace for [Xylo](https://xylomcp.com), the MCP server that gives AI agents access to Meta Ads, Google Ads, and TikTok Ads.
+Official Codex plugin marketplace for [Xylo](https://xylomcp.com), the MCP server that gives AI agents access to Meta Ads, Google Ads, TikTok Ads, X Ads, and Klaviyo.
 
 ## Install
 
@@ -14,10 +14,18 @@ Then open **Plugins** in the Codex desktop app, or type `/plugins` in Codex CLI,
 
 Start a new task after installation so Codex loads both the Xylo MCP tools and the bundled Xylo Ads skill.
 
+## Update
+
+Backend improvements arrive automatically through Xylo's remote MCP server. When Xylo announces a plugin update, open **Settings → Plugins → Xylo**, select **Refresh**, and start a new task. CLI users can run:
+
+```bash
+codex plugin marketplace upgrade xylo
+```
+
 ## Included
 
 - Xylo's production OAuth MCP connection at `https://xylomcp.com/api/mcp`
-- The Xylo Ads skill for Meta, Google, and TikTok campaign workflows
+- The Xylo Ads skill for Meta, Google, TikTok, and X campaign workflows plus Klaviyo
 - Xylo presentation assets and marketplace metadata
 
 ## Links
