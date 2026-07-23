@@ -87,7 +87,7 @@ One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all p
 
 Start every Shop task with `commerce({resource:"shop", action:"list"})`, then pass its `shop_id` to later calls.
 
-- Authorization is fail-closed to exactly six seller scopes: `seller.affiliate_messages.write`, `seller.affiliate_collaboration.write`, `seller.product.basic`, `seller.creator_marketplace.read`, `seller.affiliate_collaboration.read`, and `data.shop_analytics.public.read`.
+- Authorization is fail-closed to exactly seven seller scopes: `seller.authorization.info` for authorized-shop identity/cipher discovery, `seller.affiliate_messages.write`, `seller.affiliate_collaboration.write`, `seller.product.basic`, `seller.creator_marketplace.read`, `seller.affiliate_collaboration.read`, and `data.shop_analytics.public.read`.
 - Analytics: `performance` with `action:"shop"`, `"products"` (`mode:"list"/"get"`), `"skus"`, `"videos"`, or `"live"`. Date ranges use inclusive `start_date_ge` and exclusive `end_date_lt`.
 - Listings are read-only: `product` with `action:"search"` or `"get"`; category/brand reference reads are also available. TikTok requires the unapproved `seller.product.write` scope for listing, status, price, and image mutations, so those actions are not exposed.
 - Affiliates: creator search, collaboration list/create (including target-collaboration free-sample settings), and conversation list/read/send/mark-read.
