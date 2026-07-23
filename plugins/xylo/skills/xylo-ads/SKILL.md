@@ -88,7 +88,8 @@ One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all p
 Start every Shop task with `commerce({resource:"shop", action:"list"})`, then pass its `shop_id` to later calls.
 
 - Authorization is fail-closed to exactly seven seller scopes: `seller.authorization.info` for authorized-shop identity/cipher discovery, `seller.affiliate_messages.write`, `seller.affiliate_collaboration.write`, `seller.product.basic`, `seller.creator_marketplace.read`, `seller.affiliate_collaboration.read`, and `data.shop_analytics.public.read`.
-- Analytics: `performance` with `action:"shop"`, `"products"` (`mode:"list"/"get"`), `"skus"`, `"videos"`, or `"live"`. Date ranges use inclusive `start_date_ge` and exclusive `end_date_lt`.
+- Use only the Shop routes listed here; do not attempt hidden or unapproved `commerce` actions.
+- Analytics: `performance` with `action:"shop"`, `"products"` (`mode:"list"/"get"`), `"skus"`, `"videos"`, or `"live"`. Date ranges use inclusive `start_date_ge` and exclusive `end_date_lt`. For `shop`, single-product `products` (`mode:"get"`), and `live`, use `granularity:"ALL"` for period totals or summaries and `granularity:"1D"` only for a daily trend. Never infer a period total from a daily response; if a `1D` series is empty, use `ALL` for the summary.
 - Listings are read-only: `product` with `action:"search"` or `"get"`; category/brand reference reads are also available. TikTok requires the unapproved `seller.product.write` scope for listing, status, price, and image mutations, so those actions are not exposed.
 - Affiliates: creator search, collaboration list/create (including target-collaboration free-sample settings), and conversation list/read/send/mark-read.
 - Deliberately unavailable: customer/order records, fulfillment, logistics, returns, finance, promotions, raw affiliate orders, all product writes, inventory writes, and image DMs.
@@ -281,6 +282,8 @@ Both support Advantage+ enhancements via `creative.creative_features`, so clonin
 **DCO creation is deprecated.** `format:"dynamic"` and any `asset_feed_spec` passthrough are rejected with a pointer to `format:"flexible"`. Reading/analyzing legacy DCO ads is unaffected (ad reads, the creative analyzer, and `performance_by_copy` still surface their `asset_feed_spec`).
 
 **Format Automation (optional).** `creative.format_transformation_spec` opts one base creative into extra delivery formats (carousel, collection, single media, video slideshow) — off by default, set only when asked. Each data source needs its companion config or Meta rejects; catalog `product_extensions` auto-defaults to single-media + carousel + collection. Full matrix and the `sa_collection`-vs-`da_collection` rule are in the create-ad route description.
+
+**Product extensions ("Add catalog items") need a product set.** `creative.product_extensions: true` (SALES/TRAFFIC + single image/video only) is rejected unless a product set resolves — pass `creative.product_set_id` (look it up with `query({channel:"meta", resource:"product_set", mode:"list"})`; the catalog's "All Products" set is the usual pick), or rely on the account's default product set if one is configured (dashboard → Account → Page & Catalog). Enrolling without a set was a silent trap: the ad read back as `product_extensions` OPT_IN but bound no catalog and showed "Select products" (empty) in Ads Manager. Binding is now visible on the default ad read too (`product_set_id` surfaces without `detail:"full"`), so you can verify it without a full read.
 
 ### Scheduling & launch timing
 
