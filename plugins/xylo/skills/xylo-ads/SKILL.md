@@ -1,13 +1,13 @@
 ---
 name: xylo-ads
-description: Manage and analyze Meta, Google, TikTok, and X ad campaigns through the Xylo MCP server. Use this skill any time the user asks about ad performance (ROAS, CPA, CTR, CPM, conversions), wants to launch/edit/pause/duplicate/scale campaigns, upload or group creative, analyze audience or copy performance, break down an ad creative (hooks, awareness level, psychology, conversion architecture), run an account audit, set up automated rules (auto-pause, auto-scale budget, alerts, dayparting, budget rebalancing) or value-rule bid multipliers, research competitor ads, look up an Instagram handle or monitor UGC/tagged posts, publish or manage Facebook Page and Instagram posts/reels/stories or comments, set up pixel/CAPI/offline-conversion tracking, or compare platforms — including when the user refers to an ad account only by its brand name.
+description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, campaign management, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
 ---
 
 # Xylo Ads Skill
 
-This is the agent playbook for the Xylo MCP server. Xylo carries **300+ ad operations across Meta Ads, Google Ads, TikTok Ads, and X Ads through 27 tools**. Treat this document as the source of truth for how to use them.
+This is the agent playbook for the Xylo MCP server. Xylo carries **300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, and approved TikTok Shop workflows through 28 tools**. Treat this document as the source of truth for how to use them.
 
-**Your actual tool list is the ground truth.** The full surface is 27 tools (20 dispatchers + `describe` + `search_tools` + 4 named AI tools + `send_feedback`). If you see hundreds of platform-prefixed tools instead (`meta_list_campaigns`, …), the user is on an old connection — everything still works, but suggest reconnecting to `https://xylomcp.com/api/mcp` when convenient.
+**Your actual tool list is the ground truth.** The documented surface is 28 tools (21 dispatchers + `describe` + `search_tools` + 4 named AI tools + `send_feedback`). If you see hundreds of platform-prefixed tools instead (`meta_list_campaigns`, …), the user is on an old connection — everything still works, but suggest reconnecting to `https://xylomcp.com/api/mcp` when convenient.
 
 **Staying up to date.** When any tool result begins with a block titled **"⚠️ IMPORTANT: XYLO UPDATE AVAILABLE"**, stop and relay it to the user as a highlighted callout before continuing. Codex plugin users should refresh Xylo under Settings → Plugins and start a new task; standalone-skill users should re-download the linked skill. If the notice also requests a connector refresh, include that step. Don't bury or skip it.
 
@@ -24,6 +24,7 @@ query({ channel:"meta", resource:"campaign", mode:"list",
 - **Owned channel (email/SMS):** the `klaviyo` dispatcher reads a connected Klaviyo account — campaigns, flows, segments, profiles, metrics, events, and attributed revenue reports — no ad account needed. Gated writes: create campaigns/templates/lists/segments/profiles/coupons/images; consent (single free, bulk confirmed, unsuppress one-at-a-time); flow pause/activate; `campaign.send` always dry-runs with a live recipient estimate + `confirm_token` — nothing sends without the confirm round trip; creates land as drafts.
 - **Paid ↔ owned workflow:** turn a winning ad's audience into a matching Klaviyo segment for a follow-up campaign (`klaviyo({resource:"segment", action:"create"})`), or take creative-generation HTML straight into email — `klaviyo({resource:"template", action:"create"})` → `klaviyo({resource:"campaign", action:"assign_template"})`. To reuse or tweak an existing template, search by name instead of listing everything: `klaviyo({resource:"template", action:"list", params:{q:"welcome"}})` (list rows are lean — fetch the html with `template.get`).
 - **Writes:** `create`, `update`, `status` (pause/resume), `delete`, `duplicate`, `media` (uploads), `publish` (organic posts + comments + TCM), `tracking` (CAPI/events), `automation` (ad rules + value rules + budget schedules), `connect`.
+- **TikTok Shop:** `commerce` handles the restricted review surface: shop analytics, product listing reads, creator discovery, affiliate collaborations/free-sample settings, and creator text messages.
 - **Named AI tools** (not dispatchers): `audit_campaign`, `optimize_budget`, `generate_report`, `morpheus_audit`. Plus `send_feedback`.
 - **`describe`** — no args → capability overview; `{tool:"query"}` → that dispatcher's route list; `{tool, channel, resource, …}` → one route's exact schema + a valid example; batch several via `routes:[…]`. Call it before an unfamiliar **write**; reads are usually guessable.
 - **`search_tools({query})`** — plain-language search over every operation; returns which dispatcher + discriminators to call.
@@ -54,6 +55,7 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | Publish or manage Page / IG posts & comments                    | Organic Social                 | `publish({channel:"meta", resource:"page_post"/"instagram_media"/"comment"})` |
 | Google Ads work                                                 | Google Ads                     | `channel:"google"` on any dispatcher |
 | TikTok Ads work                                                 | TikTok Ads                     | `channel:"tiktok"` on any dispatcher |
+| TikTok Shop analytics, listings, or affiliates                  | TikTok Shop                    | `commerce({resource:"shop", action:"list"})` first |
 | GMV Max (TikTok Shop automated campaigns)                       | GMV Max                        | `insights({channel:"tiktok", lens:"gmv_max"})` (the ONLY perf path) |
 | X Ads work                                                      | X Ads                          | `x_ads({resource, action, params})` |
 | Compare platforms                                               | AI & Audit Tools               | `insights({channel:"cross", lens:"cross_platform"})` |
@@ -79,7 +81,17 @@ These override everything below. Never weaken them.
 
 ## Connector
 
-One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all platforms, all 27 tools). Meta, Google, and TikTok routes use the `channel` parameter; X routes use the resource-oriented `x_ads` dispatcher. Older platform-scoped connections and the previous per-tool surface keep working during the retirement window, but new setups should always use this URL.
+One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all platforms, all 28 documented tools). Meta, Google, and TikTok Ads routes use the `channel` parameter; X and TikTok Shop use the resource-oriented `x_ads` and `commerce` dispatchers. Older platform-scoped connections and the previous per-tool surface keep working during the retirement window, but new setups should always use this URL.
+
+## TikTok Shop (review org only)
+
+Start every Shop task with `commerce({resource:"shop", action:"list"})`, then pass its `shop_id` to later calls.
+
+- Authorization is fail-closed to exactly six seller scopes: `seller.affiliate_messages.write`, `seller.affiliate_collaboration.write`, `seller.product.basic`, `seller.creator_marketplace.read`, `seller.affiliate_collaboration.read`, and `data.shop_analytics.public.read`.
+- Analytics: `performance` with `action:"shop"`, `"products"` (`mode:"list"/"get"`), `"skus"`, `"videos"`, or `"live"`. Date ranges use inclusive `start_date_ge` and exclusive `end_date_lt`.
+- Listings are read-only: `product` with `action:"search"` or `"get"`; category/brand reference reads are also available. TikTok requires the unapproved `seller.product.write` scope for listing, status, price, and image mutations, so those actions are not exposed.
+- Affiliates: creator search, collaboration list/create (including target-collaboration free-sample settings), and conversation list/read/send/mark-read.
+- Deliberately unavailable: customer/order records, fulfillment, logistics, returns, finance, promotions, raw affiliate orders, all product writes, inventory writes, and image DMs.
 
 ## The Universal Workflow
 
