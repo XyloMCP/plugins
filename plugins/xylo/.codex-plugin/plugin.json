@@ -1,7 +1,7 @@
 {
   "name": "xylo",
-  "version": "1.0.2",
-  "description": "Manage Meta, Google, TikTok, and X ads plus Klaviyo from Codex with Xylo.",
+  "version": "1.0.3",
+  "description": "Manage ads, Klaviyo, and approved TikTok Shop workflows from Codex with Xylo.",
   "author": {
     "name": "Morpheus Media",
     "email": "support@xylomcp.com",
@@ -14,8 +14,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Xylo",
-    "shortDescription": "Run ads across Meta, Google, TikTok, and X from Codex.",
-    "longDescription": "Connect Codex to Xylo's 300+ ad operations across Meta Ads, Google Ads, TikTok Ads, and X Ads, plus Klaviyo, with an embedded workflow and safety playbook.",
+    "shortDescription": "Run ads, Klaviyo, and approved TikTok Shop workflows from Codex.",
+    "longDescription": "Connect Codex to Xylo's 300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, Klaviyo, and approved TikTok Shop workflows, with an embedded safety playbook.",
     "developerName": "Morpheus Media",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
