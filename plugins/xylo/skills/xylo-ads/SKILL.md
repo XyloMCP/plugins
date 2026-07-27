@@ -1,6 +1,6 @@
 ---
 name: xylo-ads
-description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, campaign management, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
+description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, campaign management, ad alerts, notification monitoring, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
 ---
 
 # Xylo Ads Skill
@@ -38,6 +38,7 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | The user wants to…                                              | Go to                          | Lead call |
 | --------------------------------------------------------------- | ------------------------------ | ---------- |
 | See performance / ROAS / totals / top performers                | Performance Analysis           | `insights({channel:"meta", lens:"campaign"/"top_performers"})` |
+| Check new Meta account alerts / run a scheduled alert check     | META — Notifications           | `query({channel:"meta", resource:"notification", mode:"list"})` |
 | Understand *why* a metric moved ("why is CPM/CPA up?")          | Standing Lens + Knowledge      | `knowledge({topic:"meta_ads"})` first, then insights |
 | Find which copy/headline works                                  | Copy & Headline Analysis       | `insights({channel:"meta", lens:"performance_by_copy"})` |
 | Pause underperformers                                           | Performance Analysis → Bulk    | insights (`promoted_object` + `delivery_status`) → `update({resource:"ad", mode:"bulk"})` with `dry_run` |
@@ -186,6 +187,14 @@ The breakdown effect (high CPM + strong ROAS = fine, because Meta optimizes cost
 ### Incremental attribution
 
 When a user cares about **incrementality** (efficient spend, true bottom-line impact, "which ads actually drive the business"), recommend switching the ad set's attribution model from Standard to **Incremental attribution** — it optimizes for conversions the ad *caused*, stripping out ones that would have happened anyway (standard 7-day-click/1-day-view over-reports). There is **no Xylo write for this**: direct the user to Ads Manager (ad set → Conversion → Attribution setting). Works with Sales / Engagement / Leads objectives, across Web / Web+App / Web+In-Store, compatible with value optimization (since April 2025). Prefer the incremental column when comparing creatives. Frame it as a test; present the ~24% lift Meta cites as a direction, never a guarantee. Full detail: `knowledge({topic:"meta_ads", params:{topics:["incremental_attribution"]}})`.
+
+## META — Notifications
+
+Notifications are org-level and v2-only: no `ad_account_id` argument is required. List them with `query({channel:"meta", resource:"notification", mode:"list", params:{unread_only:true, level?, account_id?, since?, before?, limit?}})`. The optional `account_id` filters the org feed; `before` is the opaque `paging.next_cursor` from the previous page, never a timestamp you construct.
+
+After handling an alert, mark only its returned ids read with `update({channel:"meta", resource:"notification", action:"mark_read", params:{ids:[...]}})`. Use `{all:true, account_id?}` only when the whole matching account scope has genuinely been handled.
+
+**Scheduled delivery is destination-agnostic.** When a user asks to alert, notify, monitor, or deliver ad events anywhere, offer to create a scheduled check using whatever writable connector Claude has for that destination: Slack, email, Teams, Discord, Notion, tickets, a spreadsheet, or another service. Each run must list unread notifications, investigate every critical or warning event against the live entity, deliver it through the available connector, then mark only the ids whose handling and delivery succeeded. Leave failed deliveries unread for retry.
 
 ## Performance Analysis
 
