@@ -1,6 +1,6 @@
 ---
 name: xylo-ads
-description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, campaign management, ad alerts, notification monitoring, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
+description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, campaign management, budget planning or pacing, ad alerts, notification monitoring, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
 ---
 
 # Xylo Ads Skill
@@ -20,10 +20,10 @@ query({ channel:"meta", resource:"campaign", mode:"list",
         params:{ ad_account_id:"act_…", status:"ACTIVE", name_contains:["Q3"] } })
 ```
 
-- **Reads:** `accounts` (account discovery + the saved brief), `query` (every entity read), `insights` (every metric/report), `plan` (targeting search + estimates + ad preview), `creative` (AI creative analysis/diagnosis), `competitors` (public ad libraries), `warehouse` (SQL), `knowledge` (reference brains), `klaviyo` (connected Klaviyo account: campaigns, flows, segments, profiles, metrics, attributed revenue reports), `x_ads` (X Ads accounts, campaigns, ad groups, promoted tweets, targeting, audiences, analytics, and measurement).
+- **Reads:** `accounts` (account discovery, saved brief, and live budget/KPI pacing checks), `query` (every entity read, including Notifications), `insights` (every metric/report), `plan` (targeting search + estimates + ad preview), `creative` (AI creative analysis/diagnosis plus the tagged creative library and its weekly digest), `competitors` (public ad libraries), `warehouse` (SQL), `knowledge` (reference brains), `klaviyo` (connected Klaviyo account: campaigns, flows, segments, profiles, metrics, attributed revenue reports), `x_ads` (X Ads accounts, campaigns, ad groups, promoted tweets, targeting, audiences, analytics, and measurement).
 - **Owned channel (email/SMS):** the `klaviyo` dispatcher reads a connected Klaviyo account — campaigns, flows, segments, profiles, metrics, events, and attributed revenue reports — no ad account needed. Gated writes: create campaigns/templates/lists/segments/profiles/coupons/images; consent (single free, bulk confirmed, unsuppress one-at-a-time); flow pause/activate; `campaign.send` always dry-runs with a live recipient estimate + `confirm_token` — nothing sends without the confirm round trip; creates land as drafts.
 - **Paid ↔ owned workflow:** turn a winning ad's audience into a matching Klaviyo segment for a follow-up campaign (`klaviyo({resource:"segment", action:"create"})`), or take creative-generation HTML straight into email — `klaviyo({resource:"template", action:"create"})` → `klaviyo({resource:"campaign", action:"assign_template"})`. To reuse or tweak an existing template, search by name instead of listing everything: `klaviyo({resource:"template", action:"list", params:{q:"welcome"}})` (list rows are lean — fetch the html with `template.get`).
-- **Writes:** `create`, `update`, `status` (pause/resume), `delete`, `duplicate`, `media` (uploads), `publish` (organic posts + comments + TCM), `tracking` (CAPI/events), `automation` (ad rules + value rules + budget schedules), `connect`.
+- **Writes:** `create`, `update` (including saved budget plans), `status` (pause/resume), `delete`, `duplicate`, `media` (uploads), `publish` (organic posts + comments + TCM), `tracking` (CAPI/events), `automation` (ad rules + value rules + budget schedules), `connect`.
 - **TikTok Shop:** `commerce` handles the restricted review surface: shop analytics, product listing reads, creator discovery, affiliate collaborations/free-sample settings, and creator text messages.
 - **Named AI tools** (not dispatchers): `audit_campaign`, `optimize_budget`, `generate_report`, `morpheus_audit`. Plus `send_feedback`.
 - **`describe`** — no args → capability overview; `{tool:"query"}` → that dispatcher's route list; `{tool, channel, resource, …}` → one route's exact schema + a valid example; batch several via `routes:[…]`. Call it before an unfamiliar **write**; reads are usually guessable.
@@ -38,7 +38,8 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | The user wants to…                                              | Go to                          | Lead call |
 | --------------------------------------------------------------- | ------------------------------ | ---------- |
 | See performance / ROAS / totals / top performers                | Performance Analysis           | `insights({channel:"meta", lens:"campaign"/"top_performers"})` |
-| Check new Meta account alerts / run a scheduled alert check     | META — Notifications           | `query({channel:"meta", resource:"notification", mode:"list"})` |
+| Save a client budget plan / check live spend pacing             | Budget Plans & Pacing          | `update({resource:"budget_plan"})` → `accounts({action:"pacing_check"})` |
+| Check new alerts / run a scheduled Notifications check          | Notifications                  | `query({channel:"meta", resource:"notification", mode:"list"})` |
 | Understand *why* a metric moved ("why is CPM/CPA up?")          | Standing Lens + Knowledge      | `knowledge({topic:"meta_ads"})` first, then insights |
 | Find which copy/headline works                                  | Copy & Headline Analysis       | `insights({channel:"meta", lens:"performance_by_copy"})` |
 | Pause underperformers                                           | Performance Analysis → Bulk    | insights (`promoted_object` + `delivery_status`) → `update({resource:"ad", mode:"bulk"})` with `dry_run` |
@@ -48,6 +49,8 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | Automate ("auto-pause", "scale budget", "daypart", "alert me")  | META — Automate                | `automation({channel:"meta", resource:"ad_rule"})` |
 | Bid more for high-value audiences                               | Value Rules                    | `automation({channel:"meta", resource:"value_rule_set"})` |
 | Audit account structure                                         | AI & Audit Tools               | `morpheus_audit` (deep), `audit_campaign` (quick) |
+| See the account's last 90 days of creatives, tagged and ranked   | Creative Intelligence → Library | `creative({action:"library"})` |
+| Get the week's creative report (movers, launches, fatigue)      | Creative Intelligence → Digest | `creative({action:"digest"})` |
 | Know *why* a creative works (hook, psychology, awareness)       | Creative Intelligence          | `creative({action:"analyze", channel:"meta"})` |
 | Know *why* an ad is failing/winning (delivery + creative)       | Creative Diagnostic            | `creative({action:"diagnose", channel:"meta"})` |
 | Write new creative / rewrite a hook / script a UGC ad           | Creative Frameworks            | `knowledge({topic:"creative_frameworks"})` |
@@ -188,11 +191,17 @@ The breakdown effect (high CPM + strong ROAS = fine, because Meta optimizes cost
 
 When a user cares about **incrementality** (efficient spend, true bottom-line impact, "which ads actually drive the business"), recommend switching the ad set's attribution model from Standard to **Incremental attribution** — it optimizes for conversions the ad *caused*, stripping out ones that would have happened anyway (standard 7-day-click/1-day-view over-reports). There is **no Xylo write for this**: direct the user to Ads Manager (ad set → Conversion → Attribution setting). Works with Sales / Engagement / Leads objectives, across Web / Web+App / Web+In-Store, compatible with value optimization (since April 2025). Prefer the incremental column when comparing creatives. Frame it as a test; present the ~24% lift Meta cites as a direction, never a guarantee. Full detail: `knowledge({topic:"meta_ads", params:{topics:["incremental_attribution"]}})`.
 
-## META — Notifications
+## Budget Plans & Pacing
 
-Notifications are org-level and v2-only: no `ad_account_id` argument is required. List them with `query({channel:"meta", resource:"notification", mode:"list", params:{unread_only:true, level?, account_id?, since?, before?, limit?}})`. The optional `account_id` filters the org feed; `before` is the opaque `paging.next_cursor` from the previous page, never a timestamp you construct.
+Budget plans and pacing work for Meta, Google, and TikTok accounts; X Ads is not supported. When the user gives you a plan in any format, save it with `update({resource:"budget_plan", params:{platform, account_id, markdown, targets?, period_start?, period_end?}})`. The markdown is the source of truth: faithfully preserve every number, caveat, flight date, and client rule. Extract machine-readable targets when possible, using whole-period dollars and always including one `{scope:"account", budget}` entry when the plan states an overall commitment. Convert daily budgets to the full period total.
 
-After handling an alert, mark only its returned ids read with `update({channel:"meta", resource:"notification", action:"mark_read", params:{ids:[...]}})`. Use `{all:true, account_id?}` only when the whole matching account scope has genuinely been handled.
+Check live pacing with `accounts({action:"pacing_check", params:{platform, account_id, period_start?}})`. It returns spend to date, expected spend, straight-line projected period total, deviation from the account commitment, recommended daily spend, and available ROAS/CPA/CPC checks. If it returns `NO_BUDGET_PLAN`, ask for the plan and save it first. Projection misses of at least 15% create weekly-deduped pacing notifications after a five-day warmup.
+
+## Notifications
+
+Notifications are org-level and cross-platform: actionable Meta webhook alerts plus Meta/Google/TikTok budget-pacing alerts. The required `channel:"meta"` discriminator is retained for compatibility; it does not make the inbox Meta-only. No `ad_account_id` argument is required. List notifications with `query({channel:"meta", resource:"notification", mode:"list", params:{unread_only:true, level?, type?, platform?, account_id?, since?, before?, limit?}})`. Use `type:"pacing"` for pacing alerts only. When filtering by `account_id`, also pass its `platform` (`"meta"`, `"google"`, or `"tiktok"`) so accounts with the same native id stay distinct. `before` is the opaque `paging.next_cursor` from the previous page, never a timestamp you construct.
+
+After handling an alert, mark only its returned ids read with `update({channel:"meta", resource:"notification", action:"mark_read", params:{ids:[...]}})`. Use `{all:true, platform?, account_id?}` only when the whole matching account scope has genuinely been handled, and always pair `platform` with `account_id`.
 
 **Scheduled delivery is destination-agnostic.** When a user asks to alert, notify, monitor, or deliver ad events anywhere, offer to create a scheduled check using whatever writable connector Claude has for that destination: Slack, email, Teams, Discord, Notion, tickets, a spreadsheet, or another service. Each run must list unread notifications, investigate every critical or warning event against the live entity, deliver it through the available connector, then mark only the ids whose handling and delivery succeeded. Leave failed deliveries unread for retry.
 
@@ -442,7 +451,75 @@ Then: {action:"attach", adset_id:"<id>", value_rule_set_id:"<id>"}
 
 ## Creative Intelligence
 
-Three surfaces: the **analyzer** (what a creative IS and why it performs), the **diagnostic** (why it's failing/winning, delivery + creative), and **frameworks** (how to make it better). All read-only; none touch the ad account.
+Four surfaces. Three are always available: the **analyzer** (what a creative IS and why it performs), the **diagnostic** (why it's failing/winning, delivery + creative), and **frameworks** (how to make it better). The fourth is the **library**, the account's own tagged creative store, which needs the Creative Intelligence add-on. All read-only; none touch the ad account.
+
+### Library — `creative({action:"library"})`
+
+A rolling 90-day library: every creative the account ran in the last 90 days, deduped across its ads, refreshed nightly, each one AI-tagged on a **surface layer** (asset type, visual format, hook tactic, headline tactic, messaging angle, offer type, seasonality, intended persona) and a **psych layer** (awareness level, LF8, mindstate, regulatory focus, dominant emotion, POV, product visibility, CTA clarity and timing markers). Scores are percentiles **against this account**, so they answer "does this work here", not "is this good in general". Rows are lean by default; `detail:"full"` adds ad ids, first-seen date, the complete tag set and raw metrics, so keep it for a shortlist.
+
+```
+Which hooks work in this account?
+  creative({action:"library", params:{
+    platform:"meta", account_id:"act_…",
+    date_from:"2026-06-01", date_to:"2026-06-30",
+    group_by:"hook_tactic", min_spend:100 }})
+  → one group per hook tactic: creative_count, spend, results, spend-weighted cost per result.
+
+Then the rows behind the winning group:
+  creative({action:"library", params:{
+    platform:"meta", account_id:"act_…",
+    tag_filters:{hook_tactic:"question"}, sort:"score_composite", limit:10 }})
+```
+
+The store keeps a rolling 90 days of creative-day history and nothing older, which is why the query window caps at 90 days too: it is the store's horizon, not a page size. Window defaults to the 30 days ending yesterday (windows end on the last complete day the nightly sync could fill). On multi-valued dimensions a creative counts in every group it belongs to, so group spend can exceed account spend, and untagged creatives stay visible under `untagged` rather than dropping out. A group whose creatives optimized for different events returns no cost per result: summing two different events has no nameable unit.
+
+### Digest — `creative({action:"digest"})`
+
+One call, one week: period-over-period movers, top and bottom creatives on the optimized event, new launches, and fatigue candidates (frequency, CTR decline, Meta creative_fatigue alerts). Every list is capped at 10, so it is safe inside a scheduled routine. Same data as the dashboard's Creatives tab header, so an agent and the tab never tell two stories about one week.
+
+```
+Monday creative report (scheduled routine, runs weekly):
+  creative({action:"digest", params:{platform:"meta", account_id:"act_…", period_days:7}})
+  → post movers, new launches and fatigue candidates to the user's destination,
+    then stop. Do not propose ad changes unless asked.
+```
+
+### Correcting tags — `update({resource:"creative_tags"})`
+
+When the user says a tag is wrong, fix it. A human override wins in every view, rollup and filter, and re-tagging never clobbers it.
+
+```
+update({resource:"creative_tags", params:{
+  platform:"meta", account_id:"act_…", media_key:"video:1203…",
+  overrides:{hook_tactic:"bold_claim"} }})
+
+Drop a correction and fall back to the AI value:
+  overrides:{hook_tactic:null}
+```
+
+`media_key` comes from the library rows. Only the dimensions you pass change. The write needs the add-on enabled; the reads do not.
+
+### The add-on gate is not a failure
+
+Library and digest need the **Creative Intelligence add-on** on that specific ad account: a paid per-account add-on on Brand and Agency, not available on Free. Don't quote a price; the dashboard names the exact recurring charge before it bills. Three distinct states:
+
+- **200 with `data.available:false` and `reason:"ADDON_NOT_ENABLED"`** — the call SUCCEEDED. The plan supports it; this account has not switched it on. Tell the user Creative Intelligence can be enabled for that ad account at `https://xylomcp.com/dashboard/creatives` (owner or admin), say what it would give them, and stop. Do not retry and do not report an error.
+- **403 `FEATURE_NOT_AVAILABLE`** — the org's plan has no Creative Intelligence. Say it needs Brand or higher.
+- **403 `ADDON_NOT_ENABLED`** on `update({resource:"creative_tags"})` — reads degrade, the write refuses.
+
+### Iterating on a winner
+
+To make more of what works, hold the winning DNA constant, vary one element, then generate. **Variants land staged in Xylo and are never published.** Generation is not publishing (Non-Negotiables and Generating Creative step 7): do not offer to build ads, campaigns or ad sets from them unless the user explicitly asks to run them.
+
+### Platforms: Meta is deep, TikTok follows
+
+Meta and TikTok both sync, tag and score. State the differences instead of implying parity:
+
+- The pre-purchase preview is Meta only; a TikTok response carries `teaser_available:false`.
+- TikTok **Spark ads are stored but not tagged.** Their creative is a TikTok post whose bytes cannot be resolved, so each Spark ad is one row, never deduped across ad groups, and carries no tags.
+- **Hook rate is measured on 3-second video plays on Meta and 2-second views on TikTok.** Never quote one platform's threshold over the other's numbers.
+
+**X Ads is not part of this feature.** No creative store, no tagging, no digest. Use X insights for performance work and say so plainly rather than implying coverage.
 
 ### Analyzer — `creative({action:"analyze"})`
 
@@ -627,6 +704,7 @@ The routes teach most failures at call time; this is the index. **When a call er
 - **Ad-copy update rejected a `primary_texts`/`headlines` array** → the ad is single-text, an existing-post/boosted ad, or a Flexible/Multi-media ad — copy can't be changed in place on any of these; recreate to change copy, and skip them when sweeping text edits (see Copy-update constraints).
 - **Heavy insights timing out / "please reduce the amount of data"** → `insights lens:"job" mode:"job_create"` → `mode:"job_check"` (needs the data-warehousing add-on).
 - **Warehouse call returned `{ available: false }`** → the account isn't sync-enabled (or the org lacks the add-on). Use live tools; don't retry.
+- **`creative({action:"library"/"digest"})` returned `{ available: false, reason: "ADDON_NOT_ENABLED" }`** → that succeeded. The Creative Intelligence add-on is off for this ad account; offer to have the user enable it at `https://xylomcp.com/dashboard/creatives`. Don't retry and don't call it an error.
 - **Analyzer `UNSUPPORTED_ASSET_TYPE`** → DPA/catalog ad (feed-driven), TikTok single-image (video only in v1), or no resolvable media. Don't retry; pivot to insights or pick another ad.
 - **Analyzer `analysis_quality: "degraded_thumbnail"`** → Meta wouldn't return video bytes; the analysis is valid for copy/composition/awareness/psychology but caveat hook-timing and frame-by-frame claims. Follow `degraded_reason.message` / `.kind`: `meta_video_partnership_locked` = Partnership/Branded Content where the FB video node AND the automatic Instagram-side fallback both came up empty for THIS asset — per-asset, not a blanket limitation (most partnership videos analyze at full fidelity via the IG fallback); don't suggest page-admin grants, and don't tell the user partnership ads can't be analyzed — a retry or a sibling partnership ad often succeeds. `meta_video_page_admin_required` = remediable, surface `degraded_reason.owning_page` so the user grants Editor access. `meta_video_source_unavailable` = unrecoverable, pick another ad.
 - **Analyzer `ASSET_UNAVAILABLE`** → fallback failed too (no source URL, no thumbnail). Rare — pick another ad; if widespread on one account, `send_feedback` with IDs.
