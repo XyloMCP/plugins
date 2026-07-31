@@ -24,7 +24,7 @@ query({ channel:"meta", resource:"campaign", mode:"list",
 - **Owned channel (email/SMS):** the `klaviyo` dispatcher reads a connected Klaviyo account — campaigns, flows, segments, profiles, metrics, events, and attributed revenue reports — no ad account needed. Gated writes: create campaigns/templates/lists/segments/profiles/coupons/images; consent (single free, bulk confirmed, unsuppress one-at-a-time); flow pause/activate; `campaign.send` always dry-runs with a live recipient estimate + `confirm_token` — nothing sends without the confirm round trip; creates land as drafts.
 - **Paid ↔ owned workflow:** turn a winning ad's audience into a matching Klaviyo segment for a follow-up campaign (`klaviyo({resource:"segment", action:"create"})`), or take creative-generation HTML straight into email — `klaviyo({resource:"template", action:"create"})` → `klaviyo({resource:"campaign", action:"assign_template"})`. To reuse or tweak an existing template, search by name instead of listing everything: `klaviyo({resource:"template", action:"list", params:{q:"welcome"}})` (list rows are lean — fetch the html with `template.get`).
 - **Writes:** `create`, `update` (including saved budget plans), `status` (pause/resume), `delete`, `duplicate`, `media` (uploads), `publish` (organic posts + comments + TCM), `tracking` (CAPI/events), `automation` (ad rules + value rules + budget schedules), `connect`.
-- **TikTok Shop:** `commerce` handles the restricted review surface: shop analytics, product listing reads, creator discovery, affiliate collaborations/free-sample settings, and creator text messages.
+- **TikTok Shop:** `commerce` handles the approved Shop surface: shop analytics, product listing reads and confirmed partial edits, creator discovery, affiliate collaborations/free-sample settings, and creator text messages.
 - **Named AI tools** (not dispatchers): `audit_campaign`, `optimize_budget`, `generate_report`, `morpheus_audit`. Plus `send_feedback`.
 - **`describe`** — no args → capability overview; `{tool:"query"}` → that dispatcher's route list; `{tool, channel, resource, …}` → one route's exact schema + a valid example; batch several via `routes:[…]`. Call it before an unfamiliar **write**; reads are usually guessable.
 - **`search_tools({query})`** — plain-language search over every operation; returns which dispatcher + discriminators to call.
@@ -56,6 +56,7 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | Know *why* a creative works (hook, psychology, awareness)       | Creative Intelligence          | `creative({action:"analyze", channel:"meta"})` |
 | Know *why* an ad is failing/winning (delivery + creative)       | Creative Diagnostic            | `creative({action:"diagnose", channel:"meta"})` |
 | Write new creative / rewrite a hook / script a UGC ad           | Creative Frameworks            | `knowledge({topic:"creative_frameworks"})` |
+| Decide WHICH ad formats to make next / batch variants from what's winning | Ad Formats           | `knowledge({topic:"ad_formats"})` — recipe cards joined to the library's tags |
 | Research a competitor's ads                                     | Competitor Intelligence        | `competitors({channel, action:"brand_ads"/"search"})` |
 | Look up an IG handle / monitor UGC & tagged posts               | Instagram Research             | `query({channel:"meta", resource:"instagram_account"/"instagram_media"})` |
 | Publish or manage Page / IG posts & comments                    | Organic Social                 | `publish({channel:"meta", resource:"page_post"/"instagram_media"/"comment"})` |
@@ -89,7 +90,7 @@ These override everything below. Never weaken them.
 
 One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all platforms, all 28 documented tools). Meta, Google, and TikTok Ads routes use the `channel` parameter; X and TikTok Shop use the resource-oriented `x_ads` and `commerce` dispatchers. Older platform-scoped connections and the previous per-tool surface keep working during the retirement window, but new setups should always use this URL.
 
-## TikTok Shop (review org only)
+## TikTok Shop
 
 Start every Shop task with `commerce({resource:"shop", action:"list"})`, then pass its `shop_id` to later calls.
 
@@ -486,6 +487,8 @@ Then the rows behind the winning group:
 
 The store keeps a rolling 90 days of creative-day history and nothing older, which is why the query window caps at 90 days too: it is the store's horizon, not a page size. Window defaults to the 30 days ending yesterday (windows end on the last complete day the nightly sync could fill). On multi-valued dimensions a creative counts in every group it belongs to, so group spend can exceed account spend, and untagged creatives stay visible under `untagged` rather than dropping out. A group whose creatives optimized for different events returns no cost per result: summing two different events has no nameable unit.
 
+**Close the loop.** A winning rollup names the tags to produce more of: `knowledge({topic:"ad_formats"})` maps those exact tag values (visual format + asset type) to production recipe cards — what to make, what it requires, how to vary it — and the standing SOP that runs library → formats → staged variants end to end is `knowledge({topic:"playbooks", params:{playbook:"ai_ad_production"}})`. After a round reads results, save the pattern (never the day's metrics) with `update({resource:"account_brief"})` under `creative_format_winners` / `creative_format_retired`, so the next session starts from what this one learned.
+
 ### Digest — `creative({action:"digest"})`
 
 One call, one week: period-over-period movers, top and bottom creatives on the optimized event, new launches, and fatigue candidates (frequency, CTR decline, Meta creative_fatigue alerts). Every list is capped at 10, so it is safe inside a scheduled routine. Same data as the dashboard's Creatives tab header, so an agent and the tab never tell two stories about one week.
@@ -578,7 +581,7 @@ Answers "why is this ad failing or winning?" — combines the analyzer's structu
 
 ### Frameworks — `knowledge({topic:"creative_frameworks"})`
 
-The analyzer tells you what a creative IS; the frameworks brain tells you how to make it BETTER. Call it whenever you move from analysis to creation — variations, hook rewrites, UGC scripts, fixing a salesy/low-retention cut, net-new concepts. Default call (no `params.topics`) returns the complete expert brain (hook formula, diagnostic funnel, viral scripting, copywriting, Metadeception native-feel system, Zeigarnik open-loop retention, 100 hook templates, checklists, truthfulness guardrail) — the recommended usage. Scope with `topics` only for bulk/cost (the diagnostic's fix bucket maps to a topic: `poor_hook → hooks`, `good_hook_poor_hold → open_loops + scripting`, `good_creative_weak_cta → copywriting`). **Always craft the real thing** — original scripts and concepts, never auto-generated filler.
+The analyzer tells you what a creative IS; the frameworks brain tells you how to make it BETTER. Call it whenever you move from analysis to creation — variations, hook rewrites, UGC scripts, fixing a salesy/low-retention cut, net-new concepts. Default call (no `params.topics`) returns the complete expert brain (hook formula, diagnostic funnel, viral scripting, copywriting, Metadeception native-feel system, Zeigarnik open-loop retention, 100 hook templates, checklists, truthfulness guardrail) — the recommended usage. Scope with `topics` only for bulk/cost (the diagnostic's fix bucket maps to a topic: `poor_hook → hooks`, `good_hook_poor_hold → open_loops + scripting`, `good_creative_weak_cta → copywriting`). **Always craft the real thing** — original scripts and concepts, never auto-generated filler. Choosing WHAT to make first (which video/static format, testing systems, real-asset gates) is `knowledge({topic:"ad_formats"})`; this brain then writes the hooks and scripts for the chosen format.
 
 **Canonical "explain why our top creative works":** `top_performers` by the optimized metric → analyze each winner → diff the structure (shared `awareness_level`? recurring `visual_hook`? common LF8? same `pov`/`regulatory_focus`?) → frame the recurring pattern as a testable hypothesis, then pull the frameworks brain and write net-new concepts holding the winning DNA constant while varying one element at a time.
 
@@ -697,12 +700,13 @@ Spy on any brand's public ads across Meta, Google, and TikTok libraries — **no
 
 ## Marketing Playbooks
 
-Beyond ad operations, Xylo ships 20 operator-grade marketing playbooks (SOPs) served on demand — strategy and process the account brief alone can't give you. **Never load more than one or two per task.** Get the index with `knowledge({topic:"playbooks"})`; fetch one with `knowledge({topic:"playbooks", params:{playbook:"<key>"}})`.
+Beyond ad operations, Xylo ships 21 operator-grade marketing playbooks (SOPs) served on demand — strategy and process the account brief alone can't give you. **Never load more than one or two per task.** Get the index with `knowledge({topic:"playbooks"})`; fetch one with `knowledge({topic:"playbooks", params:{playbook:"<key>"}})`.
 
 Reach for a playbook when the user asks for strategy, process, or "how should we approach X" — not for plain execution:
 
 - **ads** — platform selection, campaign structure, retargeting, landing-page alignment, reporting SOPs
 - **ad_creative** — angle matrices + the performance-data creative iteration loop (pairs with creative analysis + generation)
+- **ai_ad_production** — the standing loop: what the library says is winning → `ad_formats` recipes → staged variants → learn → remember (creates stay PAUSED; scheduled runs propose only)
 - **ab_testing** — hypothesis design, sample sizing, analysis discipline
 - **analytics** — tracking plans, UTM strategy, pixel/CAPI + Google conversion setup
 - **competitor_research** — full competitor dossier, ad-libraries-first
