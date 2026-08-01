@@ -495,6 +495,23 @@ Then the rows behind the winning group:
 
 The store keeps a rolling 90 days of creative-day history and nothing older, which is why the query window caps at 90 days too: it is the store's horizon, not a page size. Window defaults to the 30 days ending yesterday (windows end on the last complete day the nightly sync could fill). On multi-valued dimensions a creative counts in every group it belongs to, so group spend can exceed account spend, and untagged creatives stay visible under `untagged` rather than dropping out. A group whose creatives optimized for different events returns no cost per result: summing two different events has no nameable unit.
 
+#### Meta audience segments
+
+Every Meta library row carries `audience_segments`, the same New / Engaged / Existing breakdown shown in the dashboard. Each segment includes spend, impressions, clicks, the ad set's optimized-event results, conversion value, CTR, cost per result, ROAS, and spend percentage. Analyze or compare the mix only when `status:"available"`:
+
+- `not_configured` — `missing` names Engaged and/or Existing. Direct the user to `https://adsmanager.facebook.com/adsmanager/manage/advertising_settings/audience_segments?act=<numeric_account_id>` (remove `act_` from the account id). Meta starts reporting only after the definitions are saved; it does not backfill history.
+- `no_data` — both groups are configured, but Meta returned no segment rows for these dates.
+- `unsupported` — the creative had no Meta Sales-campaign delivery in the window; Audience Segments reporting is Sales-only.
+- `unavailable` — Xylo could not verify a complete three-way split. Do not reinterpret a lone New bucket as 100% New.
+
+`unclassified` preserves any combined or unknown Meta label instead of guessing it into New. `coverage_percent` compares recognized segment spend with eligible Sales spend; state material gaps. New is Meta's remainder after its account-level matching, **not** proof of a first-time buyer.
+
+For setup guidance:
+
+- **Existing:** use maintained first-party customer lists and purchaser audiences that represent people already known to the business.
+- **Engaged:** use the broad eligible warm-prospect pool, normally all website visitors up to 180 days plus eligible lead, app, and catalog engagement audiences. Meta does not support Page, Instagram, or video-engagement custom audiences in these account-level definitions.
+- **Keep recent visitors in Engaged.** Do not exclude the last seven days just to avoid counting someone who clicked and then bought. The breakdown classifies delivery using membership at the ad impression; a later site visit or purchase does not retroactively relabel that earlier impression. Existing takes precedence when someone matches both configured groups.
+
 **Close the loop.** A winning rollup names the tags to produce more of: `knowledge({topic:"ad_formats"})` maps those exact tag values (visual format + asset type) to production recipe cards — what to make, what it requires, how to vary it — and the standing SOP that runs library → formats → staged variants end to end is `knowledge({topic:"playbooks", params:{playbook:"ai_ad_production"}})`. After a round reads results, save the pattern (never the day's metrics) with `update({resource:"account_brief"})` under `creative_format_winners` / `creative_format_retired`, so the next session starts from what this one learned.
 
 ### Digest — `creative({action:"digest"})`
