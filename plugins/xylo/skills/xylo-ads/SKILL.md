@@ -71,7 +71,7 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | Pixel / CAPI / offline conversions                              | Pixel & Conversions            | `tracking({channel, action:…})` |
 | Onboard fresh accounts / group accounts into brands / "learn my account" | Setting Up a New Account | `knowledge({topic:"account_research"})` |
 | Generate new ad creative with AI                                 | Generating Creative (AI)       | `media({channel:"meta", action:"generate"})` |
-| Generate ad VIDEO with AI                                        | Generating Creative (AI)       | `media({action:"generate_video"})` (kling-video / seedance-video / omni-video; async — poll `media({action:"video_status"})`). Edit any video with natural language → `media({action:"edit_video"})`. Read `knowledge({topic:"video_generation"})` first: model routing, per-second credits, and the stills-first precision workflow (generate the exact frame as an image, then animate it via `first_frame_asset_id`) |
+| Generate ad VIDEO with AI                                        | Generating Creative (AI)       | Read `knowledge({topic:"video_generation"})` first. Kling animates an approved existing static; Seedance or Gemini Omni generates net-new scenes, deliberate typography, and cinematic product/logo frames. `generate_video` is async — poll `video_status`; `edit_video` uses Omni. |
 
 ## Non-Negotiables
 
@@ -386,7 +386,9 @@ Every generated image also lands in the brand's gallery in Xylo — send the use
 
 **Asset refs.** The dashboard's "Copy ID for Claude" button gives the user a ref like `brand_asset:{id}`, `winning_ad:{id}`, or `generated:{id}` to paste directly into a prompt. Resolve any of these with `media({action:"get_asset", params:{ref}})` to get the underlying asset (URL, dimensions, description) before using it as a reference. Refs are globally unique, so the ref alone is enough — no platform or account_id needed.
 
-**Full commercials (Director mode).** When the user wants a real multi-scene video ad — recurring characters, exact product fidelity, a story — read `knowledge({topic:"video_ad_production"})` FIRST and follow it: intake interview, locked reference sheets (product/character/location/layout, saved as brand assets with an @name map), a style prefix the user chooses (house default, brand-derived, or custom), a named shotlist, shot-by-shot generation with positional @Image references, then `media({action:"stitch"})` to join approved clips into the final file. This is a collaboration with the user at every gate, not a one-shot generation.
+**AI video policy.** Never ask a video model to generate subtitles, burned-in captions, social-app-style callouts, or pasted picture-in-picture product/logo tiles. Users add captions later in Instagram, TikTok, CapCut, or another editor. Deliberate scene-designed typography is allowed: kinetic type, title cards, signage, packaging text from an exact product reference, and cinematic product/logo end cards. Integrate real product/logo references naturally into the environment or end-card composition. Podcast host-read is the only people-format; every other video recipe is product/environment led and requires no real footage.
+
+**Full commercials (Director mode).** Read `knowledge({topic:"video_ad_production"})` FIRST. Gather exact product/logo references, then write one shot-by-shot effects timeline whose timestamped shots each carry their own camera, lighting, action, transition, audio, reference roles, and deliberate typography. That timeline is the entire generation prompt — no extra effects inventory, density map, energy arc, or separate prefix. Generate net-new commercials with Seedance or Gemini Omni; for a model comparison, pass both the identical timeline, ordered references, intended duration/aspect ratio, and audio intent. Stitch approved segments with `media({action:"stitch"})`.
 
 ## META — Bulk Operations
 
