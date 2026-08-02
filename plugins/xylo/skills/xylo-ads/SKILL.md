@@ -497,12 +497,12 @@ The store keeps a rolling 90 days of creative-day history and nothing older, whi
 
 #### Meta audience segments
 
-Every Meta library row carries `audience_segments`, the same New / Engaged / Existing breakdown shown in the dashboard. Each segment includes spend, impressions, clicks, the ad set's optimized-event results, conversion value, CTR, cost per result, ROAS, and spend percentage. Analyze or compare the mix only when `status:"available"`:
+Every Meta library row carries `audience_segments`, the same New / Engaged / Existing breakdown shown in the dashboard. Each segment includes spend, impressions, clicks, the ad set's optimized-event results, conversion value, CTR, cost per result, ROAS, and spend percentage. Analyze or compare the mix only when `status:"available"`. Use `reported` to identify the two or three buckets Meta actually returned; do not include an unreported zero bucket in a comparison. `setup` reports the Engaged and Existing configuration Xylo verified, while `missing` may name an unconfigured third bucket on an otherwise valid partial split:
 
-- `not_configured` — `missing` names Engaged and/or Existing. Direct the user to `https://adsmanager.facebook.com/adsmanager/manage/advertising_settings/audience_segments?act=<numeric_account_id>` (remove `act_` from the account id). Meta starts reporting only after the definitions are saved; it does not backfill history.
-- `no_data` — both groups are configured, but Meta returned no segment rows for these dates.
+- `not_configured` — too few trustworthy buckets were reported and `missing` names Engaged and/or Existing. Direct the user to `https://adsmanager.facebook.com/adsmanager/manage/advertising_settings/audience_segments?act=<numeric_account_id>` (remove `act_` from the account id). Meta starts reporting only after the definitions are saved; it does not backfill history.
+- `no_data` — Xylo verified at least one configured definition, but Meta returned no segment rows for these dates. Meta may withhold the entire spend breakdown until every definition is active; never derive percentages from setup alone.
 - `unsupported` — the creative had no Meta Sales-campaign delivery in the window; Audience Segments reporting is Sales-only.
-- `unavailable` — Xylo could not verify a complete three-way split. Do not reinterpret a lone New bucket as 100% New.
+- `unavailable` — Xylo could not verify at least two labeled buckets. Do not reinterpret a lone New bucket as 100% New.
 
 `unclassified` preserves any combined or unknown Meta label instead of guessing it into New. `coverage_percent` compares recognized segment spend with eligible Sales spend; state material gaps. New is Meta's remainder after its account-level matching, **not** proof of a first-time buyer.
 
