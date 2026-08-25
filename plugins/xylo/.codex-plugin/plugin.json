@@ -1,7 +1,7 @@
 {
   "name": "xylo",
-  "version": "1.0.40",
-  "description": "Manage ads, Klaviyo, and approved TikTok Shop workflows from Codex with Xylo.",
+  "version": "1.0.47",
+  "description": "Manage ads, Klaviyo, Google Analytics, and approved TikTok Shop workflows from Codex with Xylo.",
   "author": {
     "name": "Morpheus Media",
     "email": "support@xylomcp.com",
@@ -9,13 +9,13 @@
   },
   "homepage": "https://xylomcp.com/docs",
   "repository": "https://github.com/XyloMCP/plugins",
-  "keywords": ["advertising", "meta-ads", "google-ads", "tiktok-ads", "x-ads", "klaviyo", "mcp"],
+  "keywords": ["advertising", "meta-ads", "google-ads", "tiktok-ads", "x-ads", "klaviyo", "google-analytics", "mcp"],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Xylo",
-    "shortDescription": "Run ads, Klaviyo, and approved TikTok Shop workflows from Codex.",
-    "longDescription": "Connect Codex to Xylo's 300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, Klaviyo, and approved TikTok Shop workflows, with an embedded safety playbook.",
+    "shortDescription": "Run ads, Klaviyo, Google Analytics, and approved TikTok Shop workflows from Codex.",
+    "longDescription": "Connect Codex to Xylo's 300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, Klaviyo, Google Analytics, and approved TikTok Shop workflows, with an embedded safety playbook.",
     "developerName": "Morpheus Media",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
