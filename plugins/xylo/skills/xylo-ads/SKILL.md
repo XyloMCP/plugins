@@ -53,6 +53,8 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | Get the week's creative report (movers, launches, fatigue)      | Creative Intelligence → Digest | `creative({action:"digest"})` |
 | Mine ad comments for sentiment, objections, and customer language | Creative Intelligence → Comments | `creative({action:"comments"})` |
 | Learn which primary text and headlines carry performance       | Creative Intelligence → Ad copy | `creative({action:"copy"})` |
+| See how the brand's own Instagram posts and Reels performed      | Organic Intelligence → Library | `creative({action:"organic_library"})` (Instagram account id) |
+| Get the week's Instagram organic report                          | Organic Intelligence → Digest  | `creative({action:"organic_digest"})` |
 | Know *why* a creative works (hook, psychology, awareness)       | Creative Intelligence          | `creative({action:"analyze", channel:"meta"})` |
 | Know *why* an ad is failing/winning (delivery + creative)       | Creative Diagnostic            | `creative({action:"diagnose", channel:"meta"})` |
 | Write new creative / rewrite a hook / script a UGC ad           | Creative Frameworks            | `knowledge({topic:"creative_frameworks"})` |
@@ -476,7 +478,7 @@ Then: {action:"attach", adset_id:"<id>", value_rule_set_id:"<id>"}
 
 ## Creative Intelligence
 
-Six surfaces. Three are always available: the **analyzer** (what a creative IS and why it performs), the **diagnostic** (why it's failing/winning, delivery + creative), and **frameworks** (how to make it better). The **library**, **comment archive**, and **Ad copy archive** are the account's Creative Intelligence store and need the add-on. All read-only; none touch the ad account.
+Seven surfaces. Three are always available: the **analyzer** (what a creative IS and why it performs), the **diagnostic** (why it's failing/winning, delivery + creative), and **frameworks** (how to make it better). The **library**, **comment archive**, and **Ad copy archive** are the account's Creative Intelligence store and need that add-on. The **Instagram organic post library** is a separate add-on on a separate connection — an Instagram account, not an ad account. All read-only; none touch the ad account or the Instagram profile.
 
 ### Library — `creative({action:"library"})`
 
@@ -564,6 +566,52 @@ Drop a correction and fall back to the AI value:
 
 `media_key` comes from the library rows. Only the dimensions you pass change. The write needs the add-on enabled; the reads do not.
 
+### Instagram organic posts — `creative({action:"organic_library"/"organic_post"/"organic_digest"})`
+
+The brand's own **unpaid** Instagram feed posts and Reels, tagged with an organic editorial taxonomy: niche, audience need, content pillar, premise, angle, viewer payoff, hook mechanism, story structure, delivery style, creator voice, series, production style, participation intent, shelf life and media coverage. Use it to answer "which of our posts performed best", "which hooks earn engagement on our own feed", and "what organic content is worth turning into an ad". Metrics are reach, views, likes, comments, saves, shares, follows, total interactions, engagement rate, save/share/follow/reach rates, Reels average watch time, and account-wide percentile scores.
+
+**`account_id` here is an Instagram account, not an ad account.** An Instagram account is its own connection in Xylo, so organic works with no ad account at all — someone can use Xylo for organic alone. Find the ids under `meta.instagram_accounts` on `accounts({channel:"meta", action:"list"})`; each entry carries `instagram_user_id`, `username`, and whether the add-on is on. Passing an `act_…` id here is an error, not a fallback.
+
+```
+Which organic hooks earn engagement?
+  creative({action:"organic_library", params:{
+    account_id:"17841400000000001", media_product_type:"REELS",
+    group_by:"hook_mechanism", sort:"reach", limit:20 }})
+
+One post in depth, with its daily series:
+  creative({action:"organic_post", params:{account_id:"1784…", media_id:"179…"}})
+
+Weekly organic report (movers rank on REACH, since organic has no spend):
+  creative({action:"organic_digest", params:{account_id:"1784…", period_days:7}})
+
+Correct a tag (nothing is published to Instagram; this edits Xylo's own labels):
+  update({resource:"organic_tags", params:{
+    account_id:"1784…", media_id:"179…", overrides:{hook_mechanism:"direct_promise"} }})
+```
+
+Organic Intel stores its own deep observations, account context, bounded performance hypotheses and new video ideas on posts. Use those plus organic tags to propose new concepts; respect media coverage and uncertainty. There is no standalone organic analyzer. Library date filters select publication dates; card metrics remain the latest lifetime totals. Unavailable follows are unknown, never zero.
+
+#### Organic is not paid, and must not be advised on as if it were
+
+The two libraries share a taxonomy, which makes them look interchangeable. They are not, and reasoning about one the way you reason about the other gives bad advice in both directions.
+
+|                     | Organic post                                               | Paid ad                                                    |
+| ------------------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| What it's judged on | Attention **earned** — reach, saves, shares, follows        | What it **drives** — conversions, ROAS, CPA, the optimized event |
+| Money               | None. No spend, bid, budget, CPA or ROAS exists             | Spend is the lever and the denominator                      |
+| How you improve it  | Hooks and openings, formats and pacing, cadence and consistency, recurring series, replies and community, Reels vs feed, more of what got saved and shared | Offer strength, proof, objection handling, landing-page match, audience, placement, budget and bid |
+| A "winner" is       | A post that travelled — saves and shares, not likes alone   | An ad that converted at an acceptable cost                  |
+
+So: never compute or quote a cost figure on an organic post; never rank organic posts against ads or blend them into one table or total; never call an organic post a loser for having no conversions. A possible bridge is a hypothesis — an organic post whose **hook, angle or format** is earning outsized saves and shares is worth testing as a paid ad. Say that as a hypothesis to test, never as a promise that it will convert: attention and purchase intent are different signals.
+
+**Say these three things out loud rather than guessing, because they are what makes the numbers readable.** Instagram reports a post's LIFETIME totals only, so Xylo manufactures the daily series by differencing consecutive nightly snapshots.
+
+- A post's **first snapshot has `delta: null`** — there is nothing to difference it against. That is the honest answer, not missing data. `restated: true` means Instagram revised a lifetime total downward and that day's delta was clamped to zero.
+- **Backfill is impossible.** A post published before the add-on was switched on has exactly one data point, its lifetime total on the first snapshot. Early history is genuinely absent, not late.
+- **`maturing: true` is never a winner.** The post is under about seven days old, or under the account's reach floor: shown, still climbing, deliberately unscored, and not comparable to a mature post. `scores: null` with `maturing: false` means something different — the account has fewer than 10 matured posts, so percentiles are suppressed as noise rather than presented as confident.
+
+Every rate is `null` on a zero denominator, never a flattering `0`; leave it blank rather than printing a zero. `reach_rate_baseline:"enable_day"` marks a follower baseline captured when the add-on was switched on rather than when the post went out, so call that post's reach rate approximate. Windows end yesterday, and an over-long range is clamped rather than rejected — `data.window` reports what you actually got.
+
 ### The add-on gate is not a failure
 
 Library, digest, comments, and Ad copy need the **Creative Intelligence add-on** on that specific ad account: a paid per-account add-on on Brand and Agency, not available on Free. Don't quote a price; the dashboard names the exact recurring charge before it bills. You can see it coming: `creative_intel_enabled` on the accounts list and on `accounts({action:"read_brief"})` is the same predicate, so check it before routing a task through the library. Three distinct states:
@@ -571,6 +619,8 @@ Library, digest, comments, and Ad copy need the **Creative Intelligence add-on**
 - **200 with `data.available:false` and `reason:"ADDON_NOT_ENABLED"`** — the call SUCCEEDED. The plan supports it; this account has not switched it on. Tell the user Creative Intelligence can be enabled for that ad account at `https://xylomcp.com/dashboard/creatives` (owner or admin), say what it would give them, and stop. Do not retry and do not report an error.
 - **403 `FEATURE_NOT_AVAILABLE`** — the org's plan has no Creative Intelligence. Say it needs Brand or higher.
 - **403 `ADDON_NOT_ENABLED`** on `update({resource:"creative_tags"})` — reads degrade, the write refuses.
+
+The Instagram organic reads behave identically but are a **separate add-on on a separate connection**: it is bought per Instagram account, its `ADDON_NOT_ENABLED` degrade points at `https://xylomcp.com/dashboard/organic`, and `update({resource:"organic_tags"})` is the write that refuses with 403 instead of degrading. `creative_intel_enabled` on an ad account says nothing about it — read `organic_intel_enabled` on the Instagram entry in `meta.instagram_accounts` instead.
 
 ### Iterating on a winner
 
@@ -618,11 +668,13 @@ The analyzer tells you what a creative IS; the frameworks brain tells you how to
 Hierarchy: **Campaign → Ad Group → Ad/Keyword**. Campaigns default to PAUSED. Everything is `channel:"google"`; account resolution returns a `customer_id`.
 
 - **Conversion lag (read before judging recent performance):** Google attributes each conversion to the **click date**, so conversion metrics (`conversions`, `conversions_value`, `all_conversions`, `cost_per_conversion`, ROAS) for the **last ~7 days are incomplete** and keep rising for days/weeks. `cost`/`clicks`/`impressions` are unaffected. When the window touches that zone, Google insights responses carry a ⚠️ `conversion_attribution` warning with `reliable_through`. **Never pause or scale on conversion or CPA/ROAS data from the last week** — anchor conversion decisions to a window ending ≥7 days ago; use recent days only for cost/click/impression trends.
+- **Creating a campaign:** `daily_budget` is required — Google gives every campaign its own budget. Every campaign also carries an EU Political Advertising declaration; Xylo declares `DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING` for you. Pass `contains_eu_political_advertising:"CONTAINS_EU_POLITICAL_ADVERTISING"` only for genuine political advertising — those campaigns stop serving in the EU. An account holding any *undeclared* campaign has all campaign writes rejected; clear it by declaring each one with `update({channel:"google", resource:"campaign", params:{campaign_id, contains_eu_political_advertising:"DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING"}})`.
 - **Bidding:** new advertisers start with `MAXIMIZE_CLICKS` or `MAXIMIZE_CONVERSIONS`; switch to `TARGET_CPA`/`TARGET_ROAS` only after 30+ conversions.
 - **Ad copy:** RSAs need 3+ headlines and 2+ descriptions (`create({channel:"google", resource:"ad"})`, `RESPONSIVE_SEARCH_AD`). Ad content is immutable post-create — build a new ad and remove the old to change copy. Pausing/resuming an ad is `status({channel:"google", resource:"ad"})`.
 - **Performance Max:** create campaign → at least one `asset_group` → link assets with `update({channel:"google", resource:"asset_group_asset", action:"link"})`. Strict asset minimums — check returned errors.
 - **Keyword research:** `query({channel:"google", resource:"keyword_ideas"})` — discover new keywords + search volumes (Keyword Planner) from seed `keywords` and/or a landing-page `page_url`. Returns avg monthly searches, competition, and top-of-page bid range. Defaults to US + English. Scope volumes to a place with `geo_names:["Austin, TX","California"]` (resolved for you) or numeric `geo_target_ids`; volumes are aggregated across the geos you pass, so call once per place for a per-city breakdown. Keyword Planner reports down to **city/metro** level — not individual ZIP/postal codes. Use it to scope a Search build or expand an ad group before creating keywords.
 - **Geo resolver:** `query({channel:"google", resource:"geo_target", mode:"list", params:{names:["Austin, TX"]}})` — resolve place names to geo target constant IDs (with canonical_name, target_type, reach) for `geo_target_ids` on keyword research or campaign geo targeting.
+- **Keyword lists exclude negatives:** `query({channel:"google", resource:"keyword", mode:"list"})` returns positive keywords only; pass `include_negatives:"true"` to also see the ad group's own negatives, flagged `negative:true` on each row. Campaign-level negatives live in `query({resource:"negative_keyword", mode:"list"})`.
 - **Negative keywords:** prefer shared lists (`create({resource:"negative_keyword_list"})` + `update({resource:"negative_keyword_list", action:"link_to_campaign"})`) over per-campaign negatives for broad exclusions.
 - **Recommendations:** `query({resource:"recommendation", mode:"list"})` → present → `update({resource:"recommendation", action:"apply"})` only after explicit approval (one-way).
 - **Quality:** `insights({channel:"google", lens:"quality_scores"})` before suggesting bid changes on low-performing keywords.
@@ -789,6 +841,9 @@ The routes teach most failures at call time; this is the index. **When a call er
 - **Heavy insights timing out / "please reduce the amount of data"** → `insights lens:"job" mode:"job_create"` → `mode:"job_check"` (needs the data-warehousing add-on).
 - **Warehouse call returned `{ available: false }`** → the account isn't sync-enabled (or the org lacks the add-on). Use live tools; don't retry.
 - **`creative({action:"library"/"digest"})` returned `{ available: false, reason: "ADDON_NOT_ENABLED" }`** → that succeeded. The Creative Intelligence add-on is off for this ad account; offer to have the user enable it at `https://xylomcp.com/dashboard/creatives`. Don't retry and don't call it an error.
+- **`creative({action:"organic_library"/"organic_post"/"organic_digest"})` returned `{ available: false, reason: "ADDON_NOT_ENABLED" }`** → that succeeded too. The Organic Creative Intelligence add-on is off for this Instagram account; offer to have the user switch it on at `https://xylomcp.com/dashboard/organic`. Don't retry and don't call it an error.
+- **An organic call 400s or says the account is not connected** → you probably passed an `act_…` ad account. Organic takes an **Instagram** account id; read `meta.instagram_accounts` off `accounts({channel:"meta", action:"list"})`.
+- **An Instagram post came back with `delta: null`, `scores: null` or `maturing: true`** → nothing is broken. See Instagram organic posts: the series is manufactured from nightly lifetime snapshots, there is no backfill, and a young post is deliberately unscored. Report it as such rather than as a gap.
 - **`creative({action:"comments"})` returned freshness warnings or a pending source** → analyze the rows that are present, state that the snapshot is incomplete, and do not replace it with a live Meta-comments sweep unless the user explicitly asks for live moderation data.
 - **`creative({action:"copy"})` returned a pending/error freshness state** → use any stored rows that are present, state that the snapshot is incomplete, and use the live `performance_by_copy` lens only when the user explicitly needs current account-wide data.
 - **Analyzer `UNSUPPORTED_ASSET_TYPE`** → DPA/catalog ad (feed-driven), TikTok single-image (video only in v1), or no resolvable media. Don't retry; pivot to insights or pick another ad.
