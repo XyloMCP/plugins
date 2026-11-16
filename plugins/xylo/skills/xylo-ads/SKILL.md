@@ -415,6 +415,8 @@ Three mechanisms — pick by scope:
 | Replace the image/video ON an existing ad, keeping the ad         | `update` ad `mode:"single"` + `media_swaps` |
 | Add / change / clear an ad's UTM URL parameters                   | `update` ad `mode:"single"` + `url_tags` |
 | Turn "Optimize website destination" on/off on an ad               | `update` ad `mode:"single"` + `website_destination_optimization` |
+| Turn "Shop" (Personalized destinations) on/off on an ad           | `update` ad `mode:"single"` + `personalized_destinations:{shop}` |
+| Read all 4 Personalized-destinations toggles                      | `query` ad `mode:"get"` `detail:"full"` -> `personalized_destinations` |
 | Clone an ad's exact setup but swap in new media                  | `query` ad `mode:"get"` + `detail:"full"` → `create` ad `mode:"bulk"` |
 | Update many existing ads (pause, swap creative, …)              | `update` ad `mode:"bulk"`     |
 | Edit text/URL on an existing ad, same creative shape             | `update` ad `mode:"single"`   |
@@ -436,6 +438,21 @@ Works on single-image ads, single-video ads, placement-customized ads (swap the 
 - **Read** — `query` ad `mode:"get"` with **`detail:"full"`** returns top-level **`website_destination_optimization`**: `"OPT_IN"` | `"OPT_OUT"` | `"not_set"`. `not_set` means Meta stores no entry, which delivers the same as OPT_OUT. The raw object is `creative.advantage_plus_spec.destination_spec` (whose sibling `destination_type`, e.g. `WEBSITE_AND_SHOP`, is the separate Advantage+ Shop destination). A summary read does not fetch it and omits the field entirely.
 - **Write** — `update({resource:"ad", mode:"single", params:{ad_account_id, ad_id, website_destination_optimization:false}})` (`true`/`"OPT_IN"` to enable). Meta cannot edit an existing creative, so the ad gets a faithful copy with **only** this changed, read back and verified (including the sibling Shop `destination_type` and `url_tags`) before the ad is re-pointed; a mismatch returns `AD_EDIT_NOT_APPLIED` and the ad still runs its old creative. `dry_run:true` returns the before → after plan and writes nothing. May ride along with `url_tags` / `media_swaps` / `primary_texts` / `headlines` / `link`. On create it is `creative.creative_features.optimize_website_destination`.
 - **Supported / rejected / caveats** are the same as a `url_tags` change: single-image, single-video, carousel and placement-customized ads only, and the new creative goes back through ad review.
+
+**"Personalized destinations" — all four toggles (`personalized_destinations`).** Ads Manager → Ad level → Destination → Edit shows four: **Optimize website destination**, **Browser add-ons**, **Shop**, **Product browsing**. Meta keeps the three it exposes on the creative's top-level `destination_spec`. **Read** them with `query` ad `mode:"get"` `detail:"full"` → `personalized_destinations`, each `"OPT_IN"` | `"OPT_OUT"` | `"not_set"`:
+
+| Ads Manager toggle | Field | Read | Write |
+| --- | --- | --- | --- |
+| Optimize website destination | `destination_spec.website.optimization.status` | yes | yes |
+| Shop | `destination_spec.destination_type` (`WEBSITE_AND_SHOP` / `WEBSITE_AND_SHOP_OPT_OUT`), or `destination_spec.native_commerce_experience.shop.enroll_status` | yes | yes (as `destination_type`) |
+| Product browsing | `destination_spec.native_commerce_experience.product_browsing.enroll_status` | yes | **no** — Ads Manager only |
+| Browser add-ons | *(none — Meta exposes no API field)* | no (`"unsupported"`) | **no** — Ads Manager only |
+
+- **`not_set` is not "off" for Shop and Product browsing.** It means Meta stores no entry, so **Meta's own default applies — currently ON** on sales/website ads, and Ads Manager shows the toggle ON. (Meta backfilled Product browsing onto existing ads on 2026-10-28.) Only `website_destination_optimization` `not_set` behaves as OFF. Never report an ad as shop-off or product-browsing-off from `not_set`.
+- **Write** — `update({resource:"ad", mode:"single", params:{ad_account_id, ad_id, personalized_destinations:{shop:false}}})`. Each key is independent; an omitted key keeps whatever Meta stores. Same verified faithful-copy rebuild, `dry_run`, supported/rejected shapes and caveats as a `url_tags` change. On create it is `creative.creative_features.shop` (or the raw `destination_type`).
+- **Product browsing and Browser add-ons are rejected by name, not ignored.** Meta refuses every write to `destination_spec.native_commerce_experience` from the app with `(#3) Application does not have the capability to make this API call`, and there is no field at all for Browser add-ons. Report their state from the read and tell the user to change them in Ads Manager.
+- Meta turning **Shop** on needs a Sales objective with the website conversion location; on a Leads ad set it is refused with "Please change the conversion event to Purchase on the ad set" and the ad is left untouched.
+- `degrees_of_freedom_spec.creative_features_spec.product_browsing` is **not** the toggle: Meta fills it with a default `OPT_OUT` on any creative carrying a `degrees_of_freedom_spec`, which does not track the setting. Read `personalized_destinations` instead.
 
 **Cloning an ad exactly into a NEW ad (swap only the media).** `duplicate` keeps the original media and the ad-update route is format-preserving, so for "a second ad, new image" read the parent with **`detail:"full"`** first — the default ad read omits the Advantage+ enrollment, pinned catalog **product set**, and **site links**, so a summary clone silently falls back to account defaults. Workflow: full-detail read once → for each new ad, swap `image_hash` / `video_id` (and `story_image_hash`) and forward the rest of the `creative` unchanged, **passing the entire `site_links` list** (creatives carry 10–15; sending a few shrinks the clone). Verify by diffing `creative.advantage_plus_spec` (the complete read-only enrollment matrix) between parent and clone.
 
