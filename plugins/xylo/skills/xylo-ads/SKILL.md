@@ -225,7 +225,29 @@ Default windows: **7 days for tactical (kill/scale) reads, 30 days for structura
 - **Custom pixel event** — `custom_event_type: "OTHER"` + `custom_event_str: "<event>"`.
 - **Custom Conversion** — `custom_conversion_id`.
 
-For the last two, **the top-level `leads`/`purchases` fields do NOT count the optimized event.** Pull insights with `params.include_actions: true` and count the `offsite_conversion.custom.<custom_conversion_id>` rows in `actions[]`. Rank, pick winners, pause losers, and allocate budget on **that** count and its cost-per. `optimization_goal: OFFSITE_CONVERSIONS` says *that* it optimizes conversions; only `promoted_object` says *which* one. This also applies to the `top_performers` lens, `audit_campaign`, and `optimize_budget` — their rankable metrics count standard events, so re-check any ad set whose `promoted_object` points at a custom event before acting.
+For the last two, **the top-level `leads`/`purchases` fields do NOT count the optimized event**, and the two are read DIFFERENTLY:
+
+- **Custom Conversion** (`custom_conversion_id`) → `params.include_actions: true`, then count the `offsite_conversion.custom.<custom_conversion_id>` rows in `actions[]`.
+- **Custom pixel event** (`custom_event_str`) → `params.custom_events: "<event name>"`. It is **not** in `actions[]` under its own name — Meta rolls every named custom event into one `offsite_conversion.fb_pixel_custom` total there, so `include_actions` can never give you a per-event number.
+
+Rank, pick winners, pause losers, and allocate budget on **that** count and its cost-per. `optimization_goal: OFFSITE_CONVERSIONS` says *that* it optimizes conversions; only `promoted_object` says *which* one. This also applies to the `top_performers` lens, `audit_campaign`, and `optimize_budget` — their rankable metrics count standard events, so re-check any ad set whose `promoted_object` points at a custom event before acting.
+
+### Per-named-custom-event counts: `custom_events`
+
+`params.custom_events` reports each named pixel custom event separately on every insights row — any lens (`campaign`, `adset`, `ad`, `account`), any `time_granularity`, and on async jobs as an array.
+
+- Comma-separated event names exactly as the site fires them, or `"*"` for every named event Meta returns. Pass `"*"` first to discover an account's event names, then name the ones you want.
+- Each row gains `custom_events: [{event_name, count, value}]`. `value` is null when Meta reported none; cost per event is that row's `spend / count`.
+- Named events come back **in the order asked, with `count: 0` when the event did not fire** — a side-by-side comparison keeps its zeros instead of silently losing a column. `"*"` comes back count-descending.
+- `actions[]` is untouched, and the rolled-up `offsite_conversion.fb_pixel_custom` total stays exactly where it was.
+
+Comparing two ad sets on a tiered event distribution, per day:
+
+```
+insights({channel:"meta", lens:"adset", params:{ad_account_id:"act_123", adset_id:"120249…",
+  date_from:"2026-11-11", date_to:"2026-11-16", time_granularity:"daily",
+  custom_events:"predicted_tier_1,predicted_tier_2,predicted_tier_3"}})
+```
 
 **Before diagnosing underperformance,** call `knowledge` (above). Don't invent explanations. For structural audits use `morpheus_audit` (deepest — architecture, retargeting, creative fatigue, overlap, tracking health); for quick benchmark scoring use `audit_campaign`.
 
@@ -253,7 +275,7 @@ The list and insights routes carry rich filters — narrow at the source instead
 - **Run-state — read `is_live` / `delivery_status`, NEVER `status` or `effective_status`.** Meta has no "completed" field: a campaign, ad set or ad that ran its course still reports BOTH `status: ACTIVE` and `effective_status: ACTIVE`. Every Meta campaign / ad set / ad read therefore carries `is_live` (true ONLY when it is actually delivering), `delivery_status` (`ACTIVE`, `PAUSED`, `COMPLETED`, `SCHEDULED`, `IN_PROCESS`, `WITH_ISSUES`, `PENDING_REVIEW`, `DISAPPROVED`, `NOT_DELIVERING` (billing issue), `ARCHIVED`, `DELETED`) and, when COMPLETED, `ended_at` + `ended_reason` ("campaign stop_time passed", "ad set end_time passed", "ad schedule end passed"). Never tell a user something is active off `status`. The `status` filter matches Meta's CONFIGURED status, so `status: "ACTIVE"` lists still include finished entities — Xylo adds `meta.run_state_note` saying how many, and `live_only: true` (or `delivery_status: "ACTIVE"`) returns only what is running. Ads inherit a finished or paused ad set/campaign, and an ad with its own past `ad_schedule_end_time` ends on its own. Asking for `status` in a `fields` list returns the whole run-state block with it. Google campaigns carry `delivery_status` too (Google's `primary_status`: `ELIGIBLE`, `PAUSED`, `ENDED`, `NOT_ELIGIBLE`, `LIMITED`, `MISCONFIGURED`) — a Google campaign at `status: ENABLED` with a past end date reads `delivery_status: ENDED`, not active.
 - **Insights rows have NO run-state of their own.** `insights` is performance for a window, so a top-spending ad may have ended days ago — never call an entity active from an insights row. Pass `include_run_state: true` on the campaign / ad set / ad lenses to add `delivery_status` / `is_live` / `ended_at` / `ended_reason` per row (one extra batched Meta read, first 300 entities), or `live_only: true` for only what is delivering now. Leave both off for historical analysis, where paused and ended rows still count.
 - **Pull only the fields you need (`params.fields` allowlist):** returns only those fields (plus `id`). Ad-set `targeting` is **opt-in** (can carry thousands of ZIPs) — request it explicitly with `fields: ["targeting"]`. On ads, omit `creative` to skip the large creative blob.
-- **Response size (insights):** rows return deduped top-level metrics and by default omit the heavy raw `actions[]`/`action_values[]` arrays. Pass `include_actions: true` only for a non-standard event. Broad ad-level name queries auto-use a lean field set (dropping Meta's ranking diagnostics) to dodge Meta's data-volume limit; request rankings explicitly via `fields` if needed.
+- **Response size (insights):** rows return deduped top-level metrics and by default omit the heavy raw `actions[]`/`action_values[]` arrays. Pass `include_actions: true` only for an id-keyed Custom Conversion; for a NAMED pixel custom event use `custom_events` instead, which returns just the per-event counts rather than every action row. Broad ad-level name queries auto-use a lean field set (dropping Meta's ranking diagnostics) to dodge Meta's data-volume limit; request rankings explicitly via `fields` if needed.
 
 ### Any Meta metric, and breakdowns Meta gates
 
