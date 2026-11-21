@@ -1,13 +1,13 @@
 ---
 name: xylo-ads
-description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows and Google Analytics (GA4) reporting through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, website analytics, campaign management, budget planning or pacing, ad alerts, notification monitoring, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
+description: Manage and analyze Meta, Google, TikTok, and X ad campaigns plus approved TikTok Shop workflows, Google Analytics (GA4) reporting, and Google Merchant Center product feeds through the Xylo MCP server. Use this skill any time the user asks about ad or TikTok Shop performance, website analytics, Merchant Center product disapprovals or free listings, campaign management, budget planning or pacing, ad alerts, notification monitoring, creative, affiliates, product listings, tracking, publishing, or cross-platform analysis.
 ---
 
 # Xylo Ads Skill
 
-This is the agent playbook for the Xylo MCP server. Xylo carries **300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, approved TikTok Shop workflows, and Google Analytics (GA4) through 29 tools**. Treat this document as the source of truth for how to use them.
+This is the agent playbook for the Xylo MCP server. Xylo carries **300+ operations across Meta Ads, Google Ads, TikTok Ads, X Ads, approved TikTok Shop workflows, Google Analytics (GA4), and Google Merchant Center through 30 tools**. Treat this document as the source of truth for how to use them.
 
-**Your actual tool list is the ground truth.** The documented surface is 29 tools (22 dispatchers + `describe` + `search_tools` + 4 named AI tools + `send_feedback`). If you see hundreds of platform-prefixed tools instead (`meta_list_campaigns`, …), the user is on an old connection — everything still works, but suggest reconnecting to `https://xylomcp.com/api/mcp` when convenient.
+**Your actual tool list is the ground truth.** The documented surface is 30 tools (23 dispatchers + `describe` + `search_tools` + 4 named AI tools + `send_feedback`). If you see hundreds of platform-prefixed tools instead (`meta_list_campaigns`, …), the user is on an old connection — everything still works, but suggest reconnecting to `https://xylomcp.com/api/mcp` when convenient.
 
 **Staying up to date.** When any tool result begins with a block titled **"⚠️ IMPORTANT: XYLO UPDATE AVAILABLE"**, stop and relay it to the user as a highlighted callout before continuing. Codex plugin users should refresh Xylo under Settings → Plugins and start a new task; standalone-skill users should re-download the linked skill. If the notice also requests a connector refresh, include that step. Don't bury or skip it.
 
@@ -20,7 +20,7 @@ query({ channel:"meta", resource:"campaign", mode:"list",
         params:{ ad_account_id:"act_…", status:"ACTIVE", name_contains:["Q3"] } })
 ```
 
-- **Reads:** `accounts` (account discovery, saved brief, and live budget/KPI pacing checks), `query` (every entity read, including Notifications), `insights` (every metric/report), `plan` (targeting search + estimates + ad preview), `creative` (AI creative analysis/diagnosis plus the tagged creative library and its weekly digest), `competitors` (public ad libraries), `warehouse` (SQL), `knowledge` (reference brains), `klaviyo` (connected Klaviyo account: campaigns, flows, segments, profiles, metrics, attributed revenue reports), `x_ads` (X Ads accounts, campaigns, ad groups, promoted tweets, targeting, audiences, analytics, and measurement), `ga4` (Google Analytics properties: reports, realtime, funnels, metadata, plus gated Analytics configuration writes — see its section).
+- **Reads:** `accounts` (account discovery, saved brief, and live budget/KPI pacing checks), `query` (every entity read, including Notifications), `insights` (every metric/report), `plan` (targeting search + estimates + ad preview), `creative` (AI creative analysis/diagnosis plus the tagged creative library and its weekly digest), `competitors` (public ad libraries), `warehouse` (SQL), `knowledge` (reference brains), `klaviyo` (connected Klaviyo account: campaigns, flows, segments, profiles, metrics, attributed revenue reports), `x_ads` (X Ads accounts, campaigns, ad groups, promoted tweets, targeting, audiences, analytics, and measurement), `ga4` (Google Analytics properties: reports, realtime, funnels, metadata, plus gated Analytics configuration writes — see its section), `merchant_center` (Google Merchant Center, read-only: product status and disapprovals, account issues, data sources, promotions, free-listing performance, price and best-seller reports).
 - **Owned channel (email/SMS):** the `klaviyo` dispatcher reads a connected Klaviyo account — campaigns, flows, segments, profiles, metrics, events, and attributed revenue reports — no ad account needed. Gated writes: create campaigns/templates/lists/segments/profiles/coupons/images; consent (single free, bulk confirmed, unsuppress one-at-a-time); flow pause/activate; `campaign.send` always dry-runs with a live recipient estimate + `confirm_token` — nothing sends without the confirm round trip; creates land as drafts.
 - **Paid ↔ owned workflow:** turn a winning ad's audience into a matching Klaviyo segment for a follow-up campaign (`klaviyo({resource:"segment", action:"create"})`), or take creative-generation HTML straight into email — `klaviyo({resource:"template", action:"create"})` → `klaviyo({resource:"campaign", action:"assign_template"})`. To reuse or tweak an existing template, search by name instead of listing everything: `klaviyo({resource:"template", action:"list", params:{q:"welcome"}})` (list rows are lean — fetch the html with `template.get`).
 - **Writes:** `create`, `update` (including saved budget plans), `status` (pause/resume), `delete`, `duplicate`, `media` (uploads), `publish` (organic posts + comments + TCM), `tracking` (CAPI/events), `automation` (ad rules + value rules + budget schedules), `connect`.
@@ -68,6 +68,7 @@ Every task runs through **The Universal Workflow** (below). Use this router to j
 | GMV Max (TikTok Shop automated campaigns)                       | GMV Max                        | `insights({channel:"tiktok", lens:"gmv_max"})` (the ONLY perf path) |
 | X Ads work                                                      | X Ads                          | `x_ads({resource, action, params})` |
 | Google Analytics (GA4) — site traffic, conversions, revenue     | Google Analytics               | `ga4({resource:"report", action:"run"})` — start `property.list` |
+| Merchant Center disapprovals, free listings, price benchmarks   | Google Merchant Center         | `merchant_center({resource:"account", action:"list"})` first |
 | Compare platforms                                               | AI & Audit Tools               | `insights({channel:"cross", lens:"cross_platform"})` |
 | Build a live, shareable reporting dashboard (Brand+ only)       | Reporting Dashboards           | `create({channel:"cross", resource:"dashboard"})` |
 | Audiences / lookalikes / customer match                         | Audiences                      | `create`/`update` audience resources per platform |
@@ -91,7 +92,7 @@ These override everything below. Never weaken them.
 
 ## Connector
 
-One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all platforms, all 29 documented tools). Meta, Google, and TikTok Ads routes use the `channel` parameter; X, TikTok Shop, and Google Analytics use the resource-oriented `x_ads`, `commerce`, and `ga4` dispatchers. Older platform-scoped connections and the previous per-tool surface keep working during the retirement window, but new setups should always use this URL.
+One connector: **`https://xylomcp.com/api/mcp`** — the complete surface (all platforms, all 30 documented tools). Meta, Google, and TikTok Ads routes use the `channel` parameter; X, TikTok Shop, Google Analytics, and Google Merchant Center use the resource-oriented `x_ads`, `commerce`, `ga4`, and `merchant_center` dispatchers. Older platform-scoped connections and the previous per-tool surface keep working during the retirement window, but new setups should always use this URL.
 
 ## TikTok Shop
 
@@ -887,6 +888,21 @@ Site-side measurement: traffic, engagement, key events (conversions), and revenu
 - **Quota is shared.** The GA4 Data API token pool is per property per GCP project, shared across every Xylo user of that property — reports cache 15 minutes; add `refresh:"true"` only when the user explicitly needs fresher numbers.
 - **Never blend GA4 numbers into ad-platform metrics.** GA4 sessions/key events/revenue are site-measured; Meta/Google/TikTok/X report ad-attributed conversions — the numbers will not match, and both are correct. Present them side by side and name the source. In Reporting Dashboards, GA4 metrics are their own `analytics` cards with `account`/`channel`/`source` levels.
 - Connecting a property is free on every plan (dashboard → Accounts → Connect → Google Analytics).
+
+## Google Merchant Center
+
+Product data and free-listing performance for a connected Google Merchant Center account. Read-only: Xylo never creates, edits, or deletes products, feeds, or promotions. Every call goes through `merchant_center({resource, action, params})`; start with `merchant_center({resource:"account", action:"list"})` and pass the numeric id as `params.merchant_center_id`.
+
+- **Diagnose top-down.** `account.issues` first (a suspension or unclaimed website blocks every product), then `product.summary` (status counts per country and destination, plus the top item issues), then `product.list` with `status:"disapproved"|"limited"|"pending"|"eligible"`, and `product.get` for one product's issues, resolutions, and affected destinations.
+- **Fix at the source.** A product fed by Shopify or a file data source must be fixed there (Shopify admin or the feed file); an edit made in Merchant Center is overwritten on the next fetch. `data_source.list` shows which source feeds the account. Tell the user where to make the change; never offer to edit the product.
+- **Composite product ids.** `product_id` encodes `lang~feedLabel~offerId` (for example `en~US~SKU123`). Pass the id from `product.list` or a report row back verbatim and never rebuild it. Price-competitiveness and price-insights rows carry `product_id` beside Google's raw `id`.
+- **Performance is free listings only.** `report.performance` returns clicks, impressions, CTR, and conversions for free listings (organic Shopping) by day, week, or total at account or product level; the default window is the 28 days ending yesterday. Conversions exist only for free listings. Paid Shopping performance comes from `insights({channel:"google"})`; never present free-listing clicks as ad clicks.
+- **Market reports:** `report.price_competitiveness` (your price against the benchmark other merchants charge), `report.price_insights` (Google's suggested price with predicted impression, click, and conversion change), and `report.best_sellers` (the latest weekly ranking for a required `country`, `by:"product"|"brand"`; it defaults to products the store carries, and `inventory:"all"` shows the whole market). Empty rows mean the account does not meet Google's eligibility minimums: say "not available for this account", not an error.
+- **Custom reports:** `report.query` runs raw MCQL. Performance views require a `date BETWEEN` clause, and MCQL has no `OR` and no `SELECT *`.
+- **Also:** `account.get` (homepage claim, programs, business info), `promotion.list` / `promotion.get`. Money is `{amount, currency_code}` in currency units.
+- **Errors:** a 403 is usually a Merchant Center role gap (the connected Google user needs Standard or Admin access). A 503 `MERCHANT_CENTER_PROJECT_NOT_REGISTERED` is on Xylo's side: do not ask the user to reconnect; say Xylo support must finish setup.
+- In Reporting Dashboards, free-listing metrics are their own `merchant_center` cards with `account`/`product` levels, never blended into ad clicks.
+- Connecting a Merchant Center account is free on every plan (dashboard → Accounts → Connect → Google Merchant Center).
 
 ## AI & Audit Tools
 
